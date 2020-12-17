@@ -9,26 +9,32 @@
 #include <map>
 #include <regex>
 #include <filesystem>
+#include <stack>
 
 namespace doxy2plantuml {
 
 class Plant_UML_Writer {
 public:
-	void Start() {
-		if (started) throw std::runtime_error("Builder already began");
+	void Start(std::string lang = "") {
+		if (started) throw std::runtime_error("Writer already began");
 
 		started = true;
 
 		plant_uml_file.open("./output.txt", std::fstream::out);
 		plant_uml_file << "@startuml" << std::endl;
+
+		if (lang == "c++") {
+			plant_uml_file << "set namespaceSeparator ::" << std::endl;
+		} else if (lang == "java") {
+		}
 	}
 
 	void Start_Namespace(const char * namespace_name) {
-		plant_uml_file << "namespace " << namespace_name << "{" << std::endl;
+		//plant_uml_file << "namespace " << namespace_name << "{" << std::endl;
 	}
 
 	void End_Namespace() {
-		plant_uml_file << "}" << std::endl;
+		//plant_uml_file << "}" << std::endl;
 	}
 
 	void Start_Class(const char * class_id, const char * class_name) {
@@ -39,6 +45,7 @@ public:
 		plant_uml_file << "}" << std::endl;
 	}
 
+	// these are buffered to add outside all namespaces
 	void Write_Relationship(const char * class_id_user, const char * class_id_used, IChildNode::NodeRelation relation) {
 		switch (relation) {
 			case IChildNode::PublicInheritance:
@@ -83,7 +90,7 @@ public:
 	}
 
 	void End() {
-		if (!started) throw std::runtime_error("Builder not began.");
+		if (!started) throw std::runtime_error("Writer not began.");
 
 		started = false;
 
@@ -143,14 +150,18 @@ private:
 	std::map<std::string, std::vector<std::string>> data;
 } Inheritance_Register;
 
-class Class_Name_Cleaner {
+
+class Namespace_Register {
 public:
-	std::string Clean(const char * class_name) {
-		std::string new_class_name = class_name;
-		new_class_name = std::regex_replace(new_class_name, std::regex("::"), ".");
-		return new_class_name;
+	void Add(std::string namespace_name) {
+		data[namespace_name] = true;
 	}
-} Class_Name_Cleaner;
+	bool Already_Registered(std::string namespace_name) {
+		return data.contains(namespace_name);
+	}
+private:
+	std::map<std::string, bool> data;
+} Namespace_Register;
 
 class Function_Processor {
 public:
@@ -220,13 +231,10 @@ public:
 			while (child_node) {
 				//std::cout << "\t" << "Child node: " << child_node->node()->label()->utf8() << std::endl;
 
-				std::string cleaned_class_name_derived = Class_Name_Cleaner.Clean(current_node->label()->utf8());
-				std::string cleaned_class_name_base = Class_Name_Cleaner.Clean(child_node->node()->label()->utf8());
+				if (!Inheritance_Register.Already_Registered(current_node->label()->utf8(), child_node->node()->label()->utf8())) {
+					Inheritance_Register.Add(current_node->label()->utf8(), child_node->node()->label()->utf8());
 
-				if (!Inheritance_Register.Already_Registered(cleaned_class_name_derived, cleaned_class_name_base)) {
-					Inheritance_Register.Add(cleaned_class_name_derived, cleaned_class_name_base);
-
-					Plant_UML_Writer.Write_Relationship(cleaned_class_name_derived.c_str(), cleaned_class_name_base.c_str(), child_node->relation());
+					Plant_UML_Writer.Write_Relationship(current_node->label()->utf8(), child_node->node()->label()->utf8(), child_node->relation());
 				}
 				child_node_iterator->toNext();
 				child_node = child_node_iterator->current();
@@ -263,13 +271,9 @@ public:
 			while (child_node) {
 				//std::cout << "\t" << "Child node: " << child_node->node()->label()->utf8() << std::endl;
 
-				std::string cleaned_class_name_user = Class_Name_Cleaner.Clean(current_node->label()->utf8());
-				std::string cleaned_class_name_used = Class_Name_Cleaner.Clean(child_node->node()->label()->utf8());
-
-				if (!Collaboration_Register.Already_Registered(cleaned_class_name_user, cleaned_class_name_used)) {
-					Collaboration_Register.Add(cleaned_class_name_user, cleaned_class_name_used);
-
-					Plant_UML_Writer.Write_Relationship(cleaned_class_name_user.c_str(), cleaned_class_name_used.c_str(), child_node->relation());
+				if (!Collaboration_Register.Already_Registered(current_node->label()->utf8(), child_node->node()->label()->utf8())) {
+					Collaboration_Register.Add(current_node->label()->utf8(), child_node->node()->label()->utf8());
+					Plant_UML_Writer.Write_Relationship(current_node->label()->utf8(), child_node->node()->label()->utf8(), child_node->relation());
 				}
 				child_node_iterator->toNext();
 				child_node = child_node_iterator->current();
@@ -286,7 +290,7 @@ public:
 class Class_Processor {
 public:
 	void Run(IClass * cl) {
-		// std::cout << "Processing class: " << cl->name()->latin1() << std::endl;
+		//std::cout << "Processing class: " << cl->name()->latin1() << std::endl;
 
 		// skip if already added from namespaces
 		if (Compound_Register.Already_Registered(cl->id()->utf8())) {
@@ -296,8 +300,7 @@ public:
 		}
 
 
-		std::string class_name = Class_Name_Cleaner.Clean(cl->name()->utf8());// convert :: to . for plantuml namespaces
-		Plant_UML_Writer.Start_Class(cl->id()->utf8(), class_name.c_str());
+		Plant_UML_Writer.Start_Class(cl->id()->utf8(), cl->name()->utf8());
 
 		ISectionIterator * section_iter = cl->sections();
 		ISection * current_section;
@@ -317,11 +320,6 @@ public:
 		if (collaboration_graph != nullptr) {
 			Collaboration_Graph_Processor.Run(collaboration_graph);
 		}
-
-		IGraph * inheritance_graph = cl->inheritanceGraph();
-		if (inheritance_graph != nullptr) {
-			//Inheritance_Graph_Processor.Run(inheritance_graph);
-		}
 	}
 } Class_Processor;
 
@@ -329,6 +327,15 @@ class Namespace_Processor {
 public:
 	void Run(INamespace * name_space) {
 		ICompoundIterator * compound_iter = name_space->nestedCompounds();
+
+		// skip if namespace already registered
+		if (Namespace_Register.Already_Registered(name_space->name()->utf8())) {
+			return;
+		} else {
+			Namespace_Register.Add(name_space->name()->utf8());
+		}
+
+		Plant_UML_Writer.Start_Namespace(name_space->name()->utf8());
 
 		ICompound * current_compound;
 		current_compound = compound_iter->current();
@@ -346,6 +353,8 @@ public:
 		}
 
 		compound_iter->release();
+
+		Plant_UML_Writer.End_Namespace();
 	}
 } Namespace_Processor;
 
@@ -403,10 +412,13 @@ public:
 int main(int argc, char** argv) {
 	std::cout << "doxy2plantuml: started" << std::endl;
 
+	std::ofstream outfile("./output.txt");
+	outfile << " ";
+	outfile.close();
+
 	IDoxygen * doxygen = createObjectModel();
 
 	std::string cwd;
-
 	if (argc > 1) {
 		cwd = std::filesystem::path(argv[1]);
 	} else {
@@ -419,8 +431,24 @@ int main(int argc, char** argv) {
 		throw std::runtime_error(xml_dir + " not found");
 	}
 
+	// Check the type of language
+	std::string lang = "";
+
+	std::ifstream indexFile;
+	indexFile.open(xml_dir + "index.xml");
+	std::string line;
+	while (!indexFile.eof()) {
+		line = "";
+		getline(indexFile, line);
+		if (line.find(".cpp")) {
+			lang = "c++";
+			break;
+		}
+	}
+	indexFile.close();
+
 	// Begin the writer
-	doxy2plantuml::Plant_UML_Writer.Start();
+	doxy2plantuml::Plant_UML_Writer.Start(lang);
 
 	// Iterate compounds
 	doxy2plantuml::Compound_Iterator.Run(doxygen);
