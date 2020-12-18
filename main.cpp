@@ -17,7 +17,6 @@ class Plant_UML_Writer {
 public:
 	void Start(std::string lang = "") {
 		if (started) throw std::runtime_error("Writer already began");
-
 		started = true;
 
 		plant_uml_file.open("./output.txt", std::fstream::out);
@@ -30,11 +29,11 @@ public:
 	}
 
 	void Start_Namespace(const char * namespace_name) {
-		//plant_uml_file << "namespace " << namespace_name << "{" << std::endl;
+		plant_uml_file << "namespace " << namespace_name << "{" << std::endl;
 	}
 
 	void End_Namespace() {
-		//plant_uml_file << "}" << std::endl;
+		plant_uml_file << "}" << std::endl;
 	}
 
 	void Start_Class(const char * class_id, const char * class_name) {
