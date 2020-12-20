@@ -7,22 +7,28 @@
 #include <sstream>
 #include <fstream>
 #include <map>
-#include <filesystem>
 #include <stack>
 
+#include <cstring>
 
 
 int main(int argc, char **argv) {
-	std::cout << "doxy2plantuml: started" << std::endl;
+	std::string xml_output_dir = "";
+	std::string plantuml_filename = "output.xml";
 
-	std::string cwd;
-	if (argc > 1) {
-		cwd = std::filesystem::path(argv[1]);
-	} else {
-		cwd = std::filesystem::path(argv[0]).parent_path();
+	if (argc != 3)
+	{
+		printf("Usage: %s xml_output_dir plantuml_filename\n", argv[0]);
+		exit(1);
+	}
+	else
+	{
+		xml_output_dir = std::string(argv[1]);
+		plantuml_filename = std::string(argv[2]);
 	}
 
-	std::string xml_dir = (cwd + "/xml/");
+
+	std::string xml_dir = (xml_output_dir + "/xml/");
 
 	IDoxygen *doxygen = createObjectModel();
 	if (!doxygen->readXMLDir(xml_dir.c_str())) {
@@ -33,7 +39,7 @@ int main(int argc, char **argv) {
 	std::stack<IGraph*> collaboration_graph_stack;
 	std::stack<IGraph*> inheritance_graph_stack;
 
-	std::ofstream outfile("./output.plantuml");
+	std::ofstream outfile(plantuml_filename);
 	outfile << "@startuml" << std::endl;
 
 
@@ -146,7 +152,7 @@ int main(int argc, char **argv) {
 			const char * curr_node_name = curr_node->label()->utf8();
 
 			// skip already processed classes
-			if (processed_class_name_map.contains(curr_node_name)) {
+			if (processed_class_name_map.find(curr_node_name) != processed_class_name_map.end()) {
 				iter->toNext();
 				continue;
 			}
@@ -182,7 +188,7 @@ int main(int argc, char **argv) {
 			const char * curr_node_name = curr_node->label()->utf8();
 
 			// skip already processed classes
-			if (processed_class_name_map.contains(curr_node_name)) {
+			if (processed_class_name_map.find(curr_node_name) != processed_class_name_map.end()) {
 				iter->toNext();
 				continue;
 			}
@@ -213,10 +219,6 @@ int main(int argc, char **argv) {
 	outfile << "@enduml" << std::endl;
 
 	doxygen->release();
-
-
-
-	std::cout << "doxy2plantuml: done" << std::endl;
 
 	return 0;
 }
