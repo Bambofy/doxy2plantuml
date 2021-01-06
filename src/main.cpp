@@ -19,7 +19,7 @@ int main(int argc, char **argv) {
 	if (argc != 3)
 	{
 		printf("Usage: %s xml_output_dir plantuml_filename\n", argv[0]);
-		exit(1);
+		exit(-1);
 	}
 	else
 	{
@@ -93,6 +93,7 @@ int main(int argc, char **argv) {
 
 						// for all members
 						while (member_iter->current() != nullptr) {
+							break;
 							IMember::MemberKind member_kind = member_iter->current()->kind();
 
 							IMember* member_ptr = member_iter->current();
@@ -158,9 +159,12 @@ int main(int argc, char **argv) {
 			}
 			processed_class_name_map[curr_node_name] = true;
 
+
 			IChildNodeIterator* child_node_iterator = curr_node->children();
 			while (child_node_iterator->current() != nullptr) {
 				IChildNode* child_node = child_node_iterator->current();
+
+
 				outfile << curr_node_name << " --|> " << child_node->node()->label()->utf8() << std::endl;
 				child_node_iterator->toNext();
 			}
@@ -199,11 +203,28 @@ int main(int argc, char **argv) {
 				IChildNode* child_node = child_node_iterator->current();
 
 				// for some reason inherited relationships are in the collaborations
+				// so ignore them
 				if (child_node->relation() != IChildNode::Usage) {
 					child_node_iterator->toNext();
 					continue;
 				}
-				outfile << curr_node->label()->utf8() << " --> " << child_node->node()->label()->utf8() << std::endl;
+
+
+				bool edge_is_pointer_ref = false;
+
+				IEdgeLabelIterator* edge_iterator = child_node->edgeLabels();
+				while (edge_iterator->current() != nullptr) {
+					if (strstr(child_node->edgeLabels()->current()->label()->utf8(), "_ref")) {
+						edge_is_pointer_ref = true;
+					}
+					edge_iterator->toNext();
+				}
+
+				if (edge_is_pointer_ref) {
+					outfile << curr_node->label()->utf8() << " --> " << child_node->node()->label()->utf8() << std::endl;
+				} else {
+					outfile << curr_node->label()->utf8() << " ..> " << child_node->node()->label()->utf8() << std::endl;
+				}
 				child_node_iterator->toNext();
 			}
 			child_node_iterator->release();
