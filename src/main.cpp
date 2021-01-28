@@ -137,7 +137,7 @@ int main(int argc, char **argv) {
 
 
 	// to stop classes being processed more than once.
-	std::map<std::string, bool> processed_class_name_map;
+	std::map<std::string, std::vector<std::string>> processed_class_name_map;
 
 	//
 	// Write all the inhertiances out
@@ -150,18 +150,35 @@ int main(int argc, char **argv) {
 			INode* curr_node = iter->current();
 
 			const char * curr_node_name = curr_node->label()->utf8();
-
-			// skip already processed classes
-			if (processed_class_name_map.find(curr_node_name) != processed_class_name_map.end()) {
-				iter->toNext();
-				continue;
-			}
-			processed_class_name_map[curr_node_name] = true;
-
+			
 			IChildNodeIterator* child_node_iterator = curr_node->children();
 			while (child_node_iterator->current() != nullptr) {
 				IChildNode* child_node = child_node_iterator->current();
-				outfile << curr_node_name << " --|> " << child_node->node()->label()->utf8() << std::endl;
+				const char * child_node_name = child_node->node()->label()->utf8();
+				
+				// skip already processed inheritance arrows
+				if (processed_class_name_map.find(curr_node_name) != processed_class_name_map.end()) {
+					std::vector<std::string>& others = processed_class_name_map.at(curr_node_name);
+					
+					bool child_name_found = false;
+					for (std::string& child_name_str : others) {
+						if (child_name_str == child_node_name) {
+							child_name_found = true;
+						}
+					}
+					
+					if (child_name_found) {
+						child_node_iterator->toNext();
+						continue;
+					} else {
+						others.push_back(child_node_name);
+					}
+				} else {
+					processed_class_name_map[curr_node_name] = std::vector<std::string>();
+					processed_class_name_map[curr_node_name].push_back(child_node_name);
+				}
+				
+				outfile << curr_node_name << " --|> " << child_node_name << std::endl;
 				child_node_iterator->toNext();
 			}
 			child_node_iterator->release();
@@ -177,43 +194,43 @@ int main(int argc, char **argv) {
 
 	//
 	// Write all the collaborations out
-	//
-	while (!collaboration_graph_stack.empty()) {
-		IGraph* graph_starting_point = collaboration_graph_stack.top();
-
-		INodeIterator* iter = graph_starting_point->nodes();
-		while (iter->current() != nullptr) {
-			INode* curr_node = iter->current();
-
-			const char * curr_node_name = curr_node->label()->utf8();
-
-			// skip already processed classes
-			if (processed_class_name_map.find(curr_node_name) != processed_class_name_map.end()) {
-				iter->toNext();
-				continue;
-			}
-			processed_class_name_map[curr_node_name] = true;
-
-			IChildNodeIterator* child_node_iterator = curr_node->children();
-			while (child_node_iterator->current() != nullptr) {
-				IChildNode* child_node = child_node_iterator->current();
-
-				// for some reason inherited relationships are in the collaborations
-				if (child_node->relation() != IChildNode::Usage) {
-					child_node_iterator->toNext();
-					continue;
-				}
-				outfile << curr_node->label()->utf8() << " --> " << child_node->node()->label()->utf8() << std::endl;
-				child_node_iterator->toNext();
-			}
-			child_node_iterator->release();
-
-			iter->toNext();
-		}
-		iter->release();
-
-		collaboration_graph_stack.pop();
-	}
+//	//
+//	while (!collaboration_graph_stack.empty()) {
+//		IGraph* graph_starting_point = collaboration_graph_stack.top();
+//
+//		INodeIterator* iter = graph_starting_point->nodes();
+//		while (iter->current() != nullptr) {
+//			INode* curr_node = iter->current();
+//
+//			const char * curr_node_name = curr_node->label()->utf8();
+//
+//			// skip already processed classes
+//			if (processed_class_name_map.find(curr_node_name) != processed_class_name_map.end()) {
+//				iter->toNext();
+//				continue;
+//			}
+//			processed_class_name_map[curr_node_name] = true;
+//
+//			IChildNodeIterator* child_node_iterator = curr_node->children();
+//			while (child_node_iterator->current() != nullptr) {
+//				IChildNode* child_node = child_node_iterator->current();
+//
+//				// for some reason inherited relationships are in the collaborations
+//				if (child_node->relation() != IChildNode::Usage) {
+//					child_node_iterator->toNext();
+//					continue;
+//				}
+//				outfile << curr_node->label()->utf8() << " --> " << child_node->node()->label()->utf8() << std::endl;
+//				child_node_iterator->toNext();
+//			}
+//			child_node_iterator->release();
+//
+//			iter->toNext();
+//		}
+//		iter->release();
+//
+//		collaboration_graph_stack.pop();
+//	}
 
 
 	outfile << "@enduml" << std::endl;
