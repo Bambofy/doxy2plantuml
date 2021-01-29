@@ -38,6 +38,8 @@ int main(int argc, char **argv) {
 
 	std::stack<IGraph*> collaboration_graph_stack;
 	std::stack<IGraph*> inheritance_graph_stack;
+	
+	std::remove(plantuml_filename.c_str());
 
 	std::ofstream outfile(plantuml_filename);
 	outfile << "@startuml" << std::endl;
@@ -57,8 +59,7 @@ int main(int argc, char **argv) {
 		}
 	}
 	index_xml.close();
-
-
+	
 	// For each compound.
 	ICompoundIterator *compound_iter = doxygen->compounds();
 	while (compound_iter->current() != nullptr) {
@@ -195,43 +196,38 @@ int main(int argc, char **argv) {
 	//
 	// Write all the collaborations out
 //	//
-//	while (!collaboration_graph_stack.empty()) {
-//		IGraph* graph_starting_point = collaboration_graph_stack.top();
-//
-//		INodeIterator* iter = graph_starting_point->nodes();
-//		while (iter->current() != nullptr) {
-//			INode* curr_node = iter->current();
-//
-//			const char * curr_node_name = curr_node->label()->utf8();
-//
-//			// skip already processed classes
-//			if (processed_class_name_map.find(curr_node_name) != processed_class_name_map.end()) {
-//				iter->toNext();
-//				continue;
-//			}
-//			processed_class_name_map[curr_node_name] = true;
-//
-//			IChildNodeIterator* child_node_iterator = curr_node->children();
-//			while (child_node_iterator->current() != nullptr) {
-//				IChildNode* child_node = child_node_iterator->current();
-//
-//				// for some reason inherited relationships are in the collaborations
-//				if (child_node->relation() != IChildNode::Usage) {
-//					child_node_iterator->toNext();
-//					continue;
-//				}
-//				outfile << curr_node->label()->utf8() << " --> " << child_node->node()->label()->utf8() << std::endl;
-//				child_node_iterator->toNext();
-//			}
-//			child_node_iterator->release();
-//
-//			iter->toNext();
-//		}
-//		iter->release();
-//
-//		collaboration_graph_stack.pop();
-//	}
+	/**while (!collaboration_graph_stack.empty()) {
+		IGraph* graph_starting_point = collaboration_graph_stack.top();
 
+		INodeIterator* iter = graph_starting_point->nodes();
+		while (iter->current() != nullptr) {
+			INode* curr_node = iter->current();
+
+			const char * curr_node_name = curr_node->label()->utf8();
+
+			IChildNodeIterator* child_node_iterator = curr_node->children();
+			while (child_node_iterator->current() != nullptr) {
+				IChildNode* child_node = child_node_iterator->current();
+				
+				// for some reason inherited relationships are in the collaborations
+				if (child_node->relation() != IChildNode::Usage) {
+					child_node_iterator->toNext();
+					continue;
+				}
+				
+				outfile << curr_node->label()->utf8() << " --> " << child_node->node()->label()->utf8() << std::endl;
+				
+				child_node_iterator->toNext();
+			}
+			child_node_iterator->release();
+
+			iter->toNext();
+		}
+		iter->release();
+
+		collaboration_graph_stack.pop();
+	}
+*/
 
 	outfile << "@enduml" << std::endl;
 
